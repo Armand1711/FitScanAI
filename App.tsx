@@ -12,8 +12,7 @@ import LogScreen from './src/screens/LogScreen';
 import PlannerScreen from './src/screens/PlannerScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 
-// Define the param list for the tab navigator
-type TabParamList = {
+export type TabParamList = {
   Home: undefined;
   Scan: undefined;
   Logs: undefined;
@@ -24,7 +23,6 @@ type TabParamList = {
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator<TabParamList>();
 
-// Type MainTabs as a component with TabParamList
 const MainTabs = () => {
   return (
     <Tab.Navigator screenOptions={{ headerShown: false }}>
