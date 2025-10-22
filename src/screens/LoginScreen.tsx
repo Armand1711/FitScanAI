@@ -21,7 +21,7 @@ export default function LoginScreen() {
     createUserWithEmailAndPassword(auth, email, password)
       .then(() => {
         Alert.alert('Success', 'Account created!');
-        // Automatically populate Firestore (see Step 2)
+
       })
       .catch((error) => Alert.alert('Error', error.message));
   };
