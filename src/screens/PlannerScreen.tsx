@@ -1,3 +1,4 @@
+/* src/screens/PlannerScreen.tsx */
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -11,17 +12,15 @@ import {
 import axios, { AxiosError } from 'axios';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
-
+import { saveMealPlan } from '../services/mealPlanService';
 
 const GEMINI_API_KEY = 'AIzaSyDfFQVDNMK0EkrwI26kVuOeI8iGB_0y7TY';
-
 
 interface UserProfile {
   goal: number;
   dietaryPreference: string;
   allergies: string[];
 }
-
 
 export default function PlannerScreen() {
   const [plan, setPlan] = useState('');
@@ -31,8 +30,8 @@ export default function PlannerScreen() {
     allergies: [],
   });
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
- 
   useEffect(() => {
     const loadProfile = async () => {
       const user = auth.currentUser;
@@ -52,10 +51,9 @@ export default function PlannerScreen() {
     loadProfile();
   }, []);
 
- 
   const generatePlan = async () => {
     setLoading(true);
-    setPlan(''); 
+    setPlan('');
 
     try {
       const allergiesText = profile.allergies.length
@@ -99,6 +97,25 @@ Return **only plain text** – no markdown, no JSON.
     }
   };
 
+  const handleSave = async () => {
+    if (!plan) return;
+    setSaving(true);
+    try {
+      await saveMealPlan({
+        goal: profile.goal,
+        diet: profile.dietaryPreference,
+        allergies: profile.allergies,
+        planText: plan,
+        createdAt: ''
+      });
+      Alert.alert('Saved!', 'Meal plan added to your library');
+    } catch (e) {
+      Alert.alert('Error', 'Could not save plan');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.goalText}>Current Goal: {profile.goal} kcal</Text>
@@ -123,14 +140,23 @@ Return **only plain text** – no markdown, no JSON.
       )}
 
       {plan ? (
-        <Text style={styles.plan}>{plan}</Text>
+        <>
+          <Text style={styles.plan}>{plan}</Text>
+          <View style={styles.saveBtn}>
+            <Button
+              title={saving ? 'Saving…' : 'Save Plan'}
+              onPress={handleSave}
+              disabled={saving}
+              color="#28A745"
+            />
+          </View>
+        </>
       ) : (
         !loading && <Text style={styles.placeholder}>Plan will appear here</Text>
       )}
     </ScrollView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -149,4 +175,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   placeholder: { marginTop: 20, color: '#888' },
+  saveBtn: { marginTop: 15, width: 200 },
 });
