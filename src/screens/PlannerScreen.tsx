@@ -1,84 +1,152 @@
-import React, { useState, useEffect } from 'react';
-import { View, Button, Text, StyleSheet, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  Button,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
 import axios, { AxiosError } from 'axios';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
+
 const GEMINI_API_KEY = 'AIzaSyDfFQVDNMK0EkrwI26kVuOeI8iGB_0y7TY';
+
+
+interface UserProfile {
+  goal: number;
+  dietaryPreference: string;
+  allergies: string[];
+}
+
 
 export default function PlannerScreen() {
   const [plan, setPlan] = useState('');
-  const [goal, setGoal] = useState(2000); 
+  const [profile, setProfile] = useState<UserProfile>({
+    goal: 2000,
+    dietaryPreference: 'omnivore',
+    allergies: [],
+  });
+  const [loading, setLoading] = useState(false);
 
+ 
   useEffect(() => {
-    const fetchGoal = async () => {
+    const loadProfile = async () => {
       const user = auth.currentUser;
-      if (user) {
-        const userDoc = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDoc);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setGoal(data.goal || 2000);
-        }
+      if (!user) return;
+
+      const userDoc = doc(db, 'users', user.uid);
+      const snap = await getDoc(userDoc);
+      if (snap.exists()) {
+        const data = snap.data();
+        setProfile({
+          goal: data.goal ?? 2000,
+          dietaryPreference: data.dietaryPreference ?? 'omnivore',
+          allergies: data.allergies ?? [],
+        });
       }
     };
-    fetchGoal();
+    loadProfile();
   }, []);
 
+ 
   const generatePlan = async () => {
+    setLoading(true);
+    setPlan(''); 
+
     try {
+      const allergiesText = profile.allergies.length
+        ? `Avoid these allergies: ${profile.allergies.join(', ')}.`
+        : 'No allergies specified.';
+
+      const prompt = `
+You are a nutrition expert. Create a **balanced ${profile.goal} kcal daily meal plan** for a **${profile.dietaryPreference}** diet.
+${allergiesText}
+Include **breakfast, lunch, dinner, and 1-2 snacks** with **approximate calorie counts** for each item.
+Return **only plain text** – no markdown, no JSON.
+`;
+
       const response = await axios.post(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + GEMINI_API_KEY,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
-          contents: [{
-            parts: [
-              { text: `Generate a balanced ${goal} calorie daily meal plan with recipes. Return the plan as plain text, including breakfast, lunch, dinner, and snacks, with approximate calorie counts for each.` },
-            ],
-          }],
+          contents: [{ parts: [{ text: prompt }] }],
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers: { 'Content-Type': 'application/json' } }
       );
-      const result = response.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      if (!result) {
-        throw new Error('No content returned from API');
-      }
+
+      const result =
+        response.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      if (!result) throw new Error('Empty response from Gemini');
+
       setPlan(result);
-      console.log('Meal plan generated:', result.substring(0, 100));
     } catch (error) {
       if (error instanceof AxiosError) {
         if (error.response?.status === 429) {
-          console.error('Rate limit exceeded:', error.message);
-          Alert.alert('Rate Limit Exceeded', 'Gemini API limit reached. Try again later.');
+          Alert.alert('Rate limit', 'Gemini API limit reached. Try again later.');
         } else if (error.response?.status === 404) {
-          console.error('API endpoint not found:', error.response?.data);
-          Alert.alert('API Error', 'Invalid model or endpoint. Verify Gemini API key and documentation.');
+          Alert.alert('API error', 'Model not found – check Gemini key / model name.');
         } else {
-          console.error('Error generating plan:', error.message, error.response?.data);
-          Alert.alert('Error', 'Failed to generate plan. Check API key or network.');
+          Alert.alert('Error', error.message || 'Failed to generate plan');
         }
       } else {
-        console.error('Unexpected error:', error);
-        Alert.alert('Error', 'An unexpected error occurred.');
+        Alert.alert('Error', 'An unexpected error occurred');
       }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.goalText}>Current Goal: {goal} kcal</Text>
-      <Button title="Generate Meal Plan" onPress={generatePlan} />
-      {plan ? <Text style={styles.plan}>{plan}</Text> : <Text style={styles.placeholder}>Plan will appear here</Text>}
-    </View>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.goalText}>Current Goal: {profile.goal} kcal</Text>
+      <Text style={styles.dietText}>
+        Diet: {profile.dietaryPreference}
+        {profile.allergies.length
+          ? ` | Allergies: ${profile.allergies.join(', ')}`
+          : ''}
+      </Text>
+
+      <Button
+        title={loading ? 'Generating…' : 'Generate Meal Plan'}
+        onPress={generatePlan}
+        disabled={loading}
+      />
+
+      {loading && (
+        <View style={styles.spinner}>
+          <ActivityIndicator size="large" color="#28A745" />
+          <Text style={styles.loading}>Asking Gemini for your perfect plan…</Text>
+        </View>
+      )}
+
+      {plan ? (
+        <Text style={styles.plan}>{plan}</Text>
+      ) : (
+        !loading && <Text style={styles.placeholder}>Plan will appear here</Text>
+      )}
+    </ScrollView>
   );
 }
 
+
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' },
-  goalText: { fontSize: 16, marginBottom: 20, fontWeight: 'bold' },
-  plan: { marginTop: 20, textAlign: 'center', padding: 10 },
-  placeholder: { marginTop: 20, color: '#666' },
+  container: {
+    flexGrow: 1,
+    padding: 20,
+    alignItems: 'center',
+  },
+  goalText: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
+  dietText: { fontSize: 14, color: '#555', marginBottom: 20 },
+  spinner: { marginTop: 20, alignItems: 'center' },
+  loading: { marginTop: 8, color: '#666' },
+  plan: {
+    marginTop: 20,
+    textAlign: 'left',
+    lineHeight: 22,
+    paddingHorizontal: 10,
+  },
+  placeholder: { marginTop: 20, color: '#888' },
 });
