@@ -1,4 +1,3 @@
-/* src/screens/PlannerScreen.tsx */
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -9,12 +8,9 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import axios, { AxiosError } from 'axios';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { saveMealPlan } from '../services/mealPlanService';
-
-const GEMINI_API_KEY = 'AIzaSyDfFQVDNMK0EkrwI26kVuOeI8iGB_0y7TY';
+import { generateMealPlan, saveMealPlan } from '../services/mealPlanService';
 
 interface UserProfile {
   goal: number;
@@ -51,53 +47,20 @@ export default function PlannerScreen() {
     loadProfile();
   }, []);
 
-  const generatePlan = async () => {
+  const generate = async () => {
     setLoading(true);
     setPlan('');
-
     try {
-      const allergiesText = profile.allergies.length
-        ? `Avoid these allergies: ${profile.allergies.join(', ')}.`
-        : 'No allergies specified.';
-
-      const prompt = `
-You are a nutrition expert. Create a **balanced ${profile.goal} kcal daily meal plan** for a **${profile.dietaryPreference}** diet.
-${allergiesText}
-Include **breakfast, lunch, dinner, and 1-2 snacks** with **approximate calorie counts** for each item.
-Return **only plain text** – no markdown, no JSON.
-`;
-
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          contents: [{ parts: [{ text: prompt }] }],
-        },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
-
-      const result =
-        response.data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      if (!result) throw new Error('Empty response from Gemini');
-
+      const result = await generateMealPlan(profile);
       setPlan(result);
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        if (error.response?.status === 429) {
-          Alert.alert('Rate limit', 'Gemini API limit reached. Try again later.');
-        } else if (error.response?.status === 404) {
-          Alert.alert('API error', 'Model not found – check Gemini key / model name.');
-        } else {
-          Alert.alert('Error', error.message || 'Failed to generate plan');
-        }
-      } else {
-        Alert.alert('Error', 'An unexpected error occurred');
-      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to generate plan');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
+  const save = async () => {
     if (!plan) return;
     setSaving(true);
     try {
@@ -106,11 +69,10 @@ Return **only plain text** – no markdown, no JSON.
         diet: profile.dietaryPreference,
         allergies: profile.allergies,
         planText: plan,
-        createdAt: ''
       });
       Alert.alert('Saved!', 'Meal plan added to your library');
-    } catch (e) {
-      Alert.alert('Error', 'Could not save plan');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Could not save plan');
     } finally {
       setSaving(false);
     }
@@ -121,14 +83,12 @@ Return **only plain text** – no markdown, no JSON.
       <Text style={styles.goalText}>Current Goal: {profile.goal} kcal</Text>
       <Text style={styles.dietText}>
         Diet: {profile.dietaryPreference}
-        {profile.allergies.length
-          ? ` | Allergies: ${profile.allergies.join(', ')}`
-          : ''}
+        {profile.allergies.length ? ` | Allergies: ${profile.allergies.join(', ')}` : ''}
       </Text>
 
       <Button
         title={loading ? 'Generating…' : 'Generate Meal Plan'}
-        onPress={generatePlan}
+        onPress={generate}
         disabled={loading}
       />
 
@@ -145,7 +105,7 @@ Return **only plain text** – no markdown, no JSON.
           <View style={styles.saveBtn}>
             <Button
               title={saving ? 'Saving…' : 'Save Plan'}
-              onPress={handleSave}
+              onPress={save}
               disabled={saving}
               color="#28A745"
             />
@@ -159,21 +119,12 @@ Return **only plain text** – no markdown, no JSON.
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    padding: 20,
-    alignItems: 'center',
-  },
+  container: { flexGrow: 1, padding: 20, alignItems: 'center' },
   goalText: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
   dietText: { fontSize: 14, color: '#555', marginBottom: 20 },
   spinner: { marginTop: 20, alignItems: 'center' },
   loading: { marginTop: 8, color: '#666' },
-  plan: {
-    marginTop: 20,
-    textAlign: 'left',
-    lineHeight: 22,
-    paddingHorizontal: 10,
-  },
+  plan: { marginTop: 20, textAlign: 'left', lineHeight: 22, paddingHorizontal: 10 },
   placeholder: { marginTop: 20, color: '#888' },
   saveBtn: { marginTop: 15, width: 200 },
 });

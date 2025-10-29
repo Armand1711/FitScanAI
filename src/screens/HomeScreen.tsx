@@ -1,23 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Button } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Bar } from 'react-native-progress';
 import { LineChart } from 'react-native-chart-kit';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { Card } from '../components/Card';
+import { Button } from '../components/Button';
+import { Theme } from '../theme';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../../App';
 
-type HomeScreenNavigationProp = BottomTabNavigationProp<TabParamList, 'Home'>;
+type Nav = BottomTabNavigationProp<TabParamList, 'Home'>;
 
 export default function HomeScreen() {
-  const navigation = useNavigation<HomeScreenNavigationProp>();
-  const [dailyCalories, setDailyCalories] = useState(0);
-  const [weeklyData, setWeeklyData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const navigation = useNavigation<Nav>();
+  const [daily, setDaily] = useState(0);
+  const [week, setWeek] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
   const [goal, setGoal] = useState(2000);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const load = async () => {
       const user = auth.currentUser;
       if (!user) return;
 
@@ -25,83 +28,73 @@ export default function HomeScreen() {
       const weekAgo = new Date(today);
       weekAgo.setDate(today.getDate() - 6);
 
-      const q = query(
-        collection(db, 'mealLogs'),
-        where('userId', '==', user.uid)
-      );
+      const q = query(collection(db, 'mealLogs'), where('userId', '==', user.uid));
       const snap = await getDocs(q);
 
       const dayMap = new Map<number, number>();
-      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-      snap.docs.forEach(doc => {
-        const data = doc.data();
+      snap.docs.forEach(d => {
+        const data = d.data();
         const date = new Date(data.date);
         if (date >= weekAgo && date <= today) {
-          const dayIndex = date.getDay();
-          const current = dayMap.get(dayIndex) || 0;
-          dayMap.set(dayIndex, current + (data.calories || 0));
+          const idx = date.getDay();
+          dayMap.set(idx, (dayMap.get(idx) ?? 0) + (data.calories ?? 0));
         }
       });
 
-      const week = Array(7).fill(0);
-      for (let i = 0; i < 7; i++) {
-        week[i] = dayMap.get(i) || 0;
-      }
-      setWeeklyData(week);
-
-      const todayIndex = today.getDay();
-      setDailyCalories(week[todayIndex]);
+      const w = Array(7).fill(0);
+      for (let i = 0; i < 7; i++) w[i] = dayMap.get(i) ?? 0;
+      setWeek(w);
+      setDaily(w[today.getDay()]);
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        setGoal(userDoc.data()?.goal || 2000);
-      }
+      if (userDoc.exists()) setGoal(userDoc.data()?.goal ?? 2000);
     };
-    fetchData();
+    load();
   }, []);
 
   const chartConfig = {
-    backgroundGradientFrom: '#1e1e1e',
-    backgroundGradientTo: '#1e1e1e',
-    color: (opacity = 1) => `rgba(40, 167, 69, ${opacity})`,
-    strokeWidth: 3,
+    backgroundGradientFrom: '#fff',
+    backgroundGradientTo: '#fff',
+    color: () => Theme.colors.primary,
+    labelColor: () => Theme.colors.textSecondary,
+    propsForLabels: { fontSize: 11 },
     decimalPlaces: 0,
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Daily Goal: {goal} kcal</Text>
-      <Text style={styles.intake}>Today: {dailyCalories} kcal</Text>
+      <Card>
+        <Text style={styles.title}>Daily Goal</Text>
+        <Text style={styles.goal}>{goal} kcal</Text>
+        <Text style={styles.today}>Today: {daily} kcal</Text>
 
-      <Bar progress={dailyCalories / goal} width={280} color="#28A745" style={styles.bar} />
+        <Bar progress={daily / goal} width={null} color={Theme.colors.primary} style={styles.bar} />
+      </Card>
 
-      <Text style={styles.chartTitle}>7-Day Calorie Trend</Text>
-      <LineChart
-        data={{
-          labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-          datasets: [{ data: weeklyData }],
-        }}
-        width={320}
-        height={220}
-        chartConfig={chartConfig}
-        bezier
-        style={styles.chart}
-      />
+      <Card style={styles.chartCard}>
+        <Text style={styles.chartTitle}>7‑Day Trend</Text>
+        <LineChart
+          data={{ labels: ['S', 'M', 'T', 'W', 'T', 'F', 'S'], datasets: [{ data: week }] }}
+          width={320}
+          height={200}
+          chartConfig={chartConfig}
+          bezier
+          style={styles.chart}
+        />
+      </Card>
 
-      <View style={styles.button}>
-        <Button title="Scan Meal" onPress={() => navigation.navigate('Scan')} />
-      </View>
+      <Button title="Scan Meal" onPress={() => navigation.navigate('Scan')} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20, alignItems: 'center' },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
-  intake: { fontSize: 16, marginBottom: 12 },
-  bar: { marginBottom: 20 },
-  chartTitle: { fontSize: 18, fontWeight: '600', marginTop: 20, marginBottom: 8 },
-  chart: { borderRadius: 16 },
-  button: { marginTop: 20, width: 200 },
+  container: { padding: Theme.spacing(2), backgroundColor: Theme.colors.background },
+  title: { ...Theme.typography.h2, marginBottom: Theme.spacing(1) },
+  goal: { ...Theme.typography.h1, color: Theme.colors.primary },
+  today: { ...Theme.typography.body, marginBottom: Theme.spacing(2) },
+  bar: { marginTop: Theme.spacing(2) },
+  chartCard: { marginTop: Theme.spacing(3) },
+  chartTitle: { ...Theme.typography.h2, marginBottom: Theme.spacing(1) },
+  chart: { borderRadius: Theme.radius.md },
 });
