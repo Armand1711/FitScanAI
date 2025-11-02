@@ -12,7 +12,7 @@ export const LoadingOverlay = ({ message }: { message?: string }) => (
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(13,13,13,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
