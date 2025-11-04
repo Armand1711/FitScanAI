@@ -1,130 +1,98 @@
-/* src/screens/ProfileScreen.tsx */
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Button,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import { auth } from '../firebase';
-import { getProfile, saveProfile, ProfileData } from '../services/profileService';
-import { GoalInput } from '../components/GoalInput';
-import { ProfileField } from '../components/ProfileField';
-import { LogoutButton } from '../components/LogoutButton';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Image, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { GlassCard } from '../components/GlassCard';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { Theme } from '../theme';
+import { auth, db } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  const [goal, setGoal] = useState(2000);
   const [name, setName] = useState('');
-  const [dietaryPreference, setDietaryPreference] = useState('None');
+  const [goal, setGoal] = useState(2000);
+  const [diet, setDiet] = useState('omnivore');
+  const [allergies, setAllergies] = useState('');
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(async user => {
-      if (user) {
-        setUserId(user.uid);
-        setLoading(true);
-        try {
-          const data = await getProfile(user.uid);
-          setGoal(data.goal);
-          setName(data.name ?? '');
-          setDietaryPreference(data.dietaryPreference ?? 'None');
-        } catch (e) {
-          console.error(e);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        setUserId(null);
-        setGoal(2000);
-        setName('');
-        setDietaryPreference('None');
+    const load = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      if (snap.exists()) {
+        const d = snap.data();
+        setName(d.name || '');
+        setGoal(d.goal || 2000);
+        setDiet(d.dietaryPreference || 'omnivore');
+        setAllergies(d.allergies?.join(', ') || '');
+        setPhoto(d.photo || null);
       }
-    });
-    return unsub;
+    };
+    load();
   }, []);
 
- 
-  const handleSave = async () => {
-    if (!userId || goal <= 0) {
-      Alert.alert('Error', 'Please enter a valid goal > 0');
-      return;
-    }
-    setSaving(true);
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return Alert.alert('Permission', 'Gallery access required');
+
+    const res = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.7 });
+    if (res.canceled || !res.assets?.[0]) return;
+
+    setPhoto(res.assets[0].uri);
+  };
+
+  const save = async () => {
+    setLoading(true);
     try {
-      const payload: ProfileData = { goal, name, dietaryPreference };
-      await saveProfile(userId, payload);
-      Alert.alert('Success', 'Profile saved!');
+      await setDoc(doc(db, 'users', auth.currentUser!.uid), {
+        name,
+        goal,
+        dietaryPreference: diet,
+        allergies: allergies.split(',').map(a => a.trim()).filter(Boolean),
+        photo,
+      }, { merge: true });
+      Alert.alert('Saved', 'Profile updated');
     } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Could not save profile');
+      Alert.alert('Error', 'Could not save');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
-
-  
-  const handleLogout = () => {
-    auth
-      .signOut()
-      .then(() => Alert.alert('Logged Out', 'See you next time!'))
-      .catch(() => Alert.alert('Error', 'Logout failed'));
-  };
-
- 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#28A745" />
-        <Text style={styles.loading}>Loading profile…</Text>
-      </View>
-    );
-  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <GlassCard>
+        <TouchableOpacity onPress={pickPhoto} style={styles.photoContainer}>
+          <Image source={{ uri: photo || 'https://via.placeholder.com/120' }} style={styles.photo} />
+          <Text style={styles.photoText}>Change Photo</Text>
+        </TouchableOpacity>
 
-      <ProfileField
-        label="Name"
-        value={name}
-        onChange={setName}
-        placeholder="Your name"
-      />
+        <Text style={styles.label}>Name</Text>
+        <Text style={styles.value}>{name}</Text>
 
-      <GoalInput value={goal} onChange={setGoal} />
+        <Text style={styles.label}>Daily Goal</Text>
+        <Text style={styles.value}>{goal} kcal</Text>
 
-      <ProfileField
-        label="Dietary Preference"
-        value={dietaryPreference}
-        onChange={setDietaryPreference}
-        placeholder="e.g. vegetarian, vegan"
-      />
+        <Text style={styles.label}>Diet</Text>
+        <Text style={styles.value}>{diet}</Text>
 
-      <Button
-        title={saving ? 'Saving…' : 'Save Profile'}
-        onPress={handleSave}
-        color="#28A745"
-        disabled={saving}
-      />
+        <Text style={styles.label}>Allergies</Text>
+        <Text style={styles.value}>{allergies || 'None'}</Text>
 
-      <LogoutButton onLogout={handleLogout} />
-    </View>
+        <PrimaryButton title="Edit Profile" onPress={() => Alert.alert('Edit', 'Coming soon')} />
+      </GlassCard>
+
+      <PrimaryButton title="Logout" onPress={() => auth.signOut()} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  loading: { marginTop: 12, fontSize: 16, color: '#666' },
+  container: { padding: Theme.spacing(2), backgroundColor: Theme.colors.background },
+  photoContainer: { alignItems: 'center', marginBottom: Theme.spacing(3) },
+  photo: { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: Theme.colors.primary },
+  photoText: { color: Theme.colors.primary, marginTop: 8 },
+  label: { ...Theme.typography.caption, marginTop: Theme.spacing(2) },
+  value: { ...Theme.typography.body, color: '#FFF', padding: Theme.spacing(1.5), backgroundColor: '#2D2D2D', borderRadius: Theme.radius.sm, marginBottom: Theme.spacing(1) },
 });

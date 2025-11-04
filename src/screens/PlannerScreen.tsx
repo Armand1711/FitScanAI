@@ -1,60 +1,43 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Button,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
+import { ScrollView, View, Text, StyleSheet, Alert } from 'react-native';
+import { GlassCard } from '../components/GlassCard';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { LoadingOverlay } from '../components/LoadingOverlay';
+import { Theme } from '../theme';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { generateMealPlan, saveMealPlan } from '../services/mealPlanService';
 
-interface UserProfile {
-  goal: number;
-  dietaryPreference: string;
-  allergies: string[];
-}
-
 export default function PlannerScreen() {
   const [plan, setPlan] = useState('');
-  const [profile, setProfile] = useState<UserProfile>({
-    goal: 2000,
-    dietaryPreference: 'omnivore',
-    allergies: [],
-  });
+  const [profile, setProfile] = useState({ goal: 2000, dietaryPreference: 'omnivore', allergies: [] as string[] });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const loadProfile = async () => {
+    const load = async () => {
       const user = auth.currentUser;
       if (!user) return;
-
-      const userDoc = doc(db, 'users', user.uid);
-      const snap = await getDoc(userDoc);
+      const snap = await getDoc(doc(db, 'users', user.uid));
       if (snap.exists()) {
-        const data = snap.data();
+        const d = snap.data();
         setProfile({
-          goal: data.goal ?? 2000,
-          dietaryPreference: data.dietaryPreference ?? 'omnivore',
-          allergies: data.allergies ?? [],
+          goal: d.goal ?? 2000,
+          dietaryPreference: d.dietaryPreference ?? 'omnivore',
+          allergies: d.allergies ?? [],
         });
       }
     };
-    loadProfile();
+    load();
   }, []);
 
   const generate = async () => {
     setLoading(true);
-    setPlan('');
     try {
-      const result = await generateMealPlan(profile);
-      setPlan(result);
+      const text = await generateMealPlan(profile);
+      setPlan(text);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to generate plan');
+      Alert.alert('Error', e.message);
     } finally {
       setLoading(false);
     }
@@ -70,9 +53,9 @@ export default function PlannerScreen() {
         allergies: profile.allergies,
         planText: plan,
       });
-      Alert.alert('Saved!', 'Meal plan added to your library');
+      Alert.alert('Saved', 'Plan added to library');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Could not save plan');
+      Alert.alert('Error', e.message);
     } finally {
       setSaving(false);
     }
@@ -80,51 +63,38 @@ export default function PlannerScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.goalText}>Current Goal: {profile.goal} kcal</Text>
-      <Text style={styles.dietText}>
-        Diet: {profile.dietaryPreference}
-        {profile.allergies.length ? ` | Allergies: ${profile.allergies.join(', ')}` : ''}
-      </Text>
+      <GlassCard>
+        <Text style={styles.title}>Meal Planner</Text>
+        <Text style={styles.goal}>Goal: {profile.goal} kcal</Text>
+        <Text style={styles.diet}>Diet: {profile.dietaryPreference}</Text>
+        {profile.allergies.length ? (
+          <Text style={styles.allergies}>Allergies: {profile.allergies.join(', ')}</Text>
+        ) : null}
+        <PrimaryButton title={loading ? 'Generating…' : 'Generate Plan'} onPress={generate} disabled={loading} />
+      </GlassCard>
 
-      <Button
-        title={loading ? 'Generating…' : 'Generate Meal Plan'}
-        onPress={generate}
-        disabled={loading}
-      />
+      {loading && <LoadingOverlay message="Crafting your plan…" />}
 
-      {loading && (
-        <View style={styles.spinner}>
-          <ActivityIndicator size="large" color="#28A745" />
-          <Text style={styles.loading}>Asking Gemini for your perfect plan…</Text>
-        </View>
-      )}
-
-      {plan ? (
-        <>
+      {plan && (
+        <GlassCard>
+          <Text style={styles.planTitle}>Your Plan</Text>
           <Text style={styles.plan}>{plan}</Text>
           <View style={styles.saveBtn}>
-            <Button
-              title={saving ? 'Saving…' : 'Save Plan'}
-              onPress={save}
-              disabled={saving}
-              color="#28A745"
-            />
+            <PrimaryButton title={saving ? 'Saving…' : 'Save Plan'} onPress={save} disabled={saving} />
           </View>
-        </>
-      ) : (
-        !loading && <Text style={styles.placeholder}>Plan will appear here</Text>
+        </GlassCard>
       )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, padding: 20, alignItems: 'center' },
-  goalText: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  dietText: { fontSize: 14, color: '#555', marginBottom: 20 },
-  spinner: { marginTop: 20, alignItems: 'center' },
-  loading: { marginTop: 8, color: '#666' },
-  plan: { marginTop: 20, textAlign: 'left', lineHeight: 22, paddingHorizontal: 10 },
-  placeholder: { marginTop: 20, color: '#888' },
-  saveBtn: { marginTop: 15, width: 200 },
+  container: { padding: Theme.spacing(2), backgroundColor: Theme.colors.background },
+  title: { ...Theme.typography.h2, color: '#FFF', marginBottom: Theme.spacing(1) },
+  goal: { ...Theme.typography.body, color: Theme.colors.primary, fontWeight: '600' },
+  diet: { ...Theme.typography.caption },
+  allergies: { ...Theme.typography.caption, color: Theme.colors.error },
+  planTitle: { ...Theme.typography.h2, color: '#FFF', marginBottom: Theme.spacing(1) },
+  plan: { lineHeight: 22, ...Theme.typography.body, color: '#FFF' },
+  saveBtn: { marginTop: Theme.spacing(2) },
 });

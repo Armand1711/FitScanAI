@@ -1,65 +1,70 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
+import { GlassCard } from '../components/GlassCard';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { Theme } from '../theme';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase';
+import { useNavigation } from '@react-navigation/native';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigation = useNavigation<any>();
 
-  const isValidEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    console.log('Email checked:', email, 'Valid:', emailRegex.test(email)); // Debug log
-    return emailRegex.test(email);
-  };
-
-  const handleSignUp = () => {
-    if (!email || !password || password.length < 6 || !isValidEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email and a password (at least 6 characters).');
-      return;
+  const login = async () => {
+    if (!email || !password) return Alert.alert('Error', 'Fill in all fields');
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (e: any) {
+      Alert.alert('Login Failed', e.message);
+    } finally {
+      setLoading(false);
     }
-    createUserWithEmailAndPassword(auth, email, password)
-      .then(() => {
-        Alert.alert('Success', 'Account created!');
-
-      })
-      .catch((error) => Alert.alert('Error', error.message));
-  };
-
-  const handleLogin = () => {
-    if (!email || !password || !isValidEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email and password.');
-      return;
-    }
-    signInWithEmailAndPassword(auth, email, password)
-      .then(() => Alert.alert('Success', 'Logged in!'))
-      .catch((error) => Alert.alert('Error', error.message));
   };
 
   return (
     <View style={styles.container}>
-      <TextInput
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
-      <TextInput
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        style={styles.input}
-        secureTextEntry
-      />
-      <Button title="Login" onPress={handleLogin} />
-      <Button title="Sign Up" onPress={handleSignUp} />
+      <GlassCard style={styles.card}>
+        <Text style={styles.title}>Welcome Back</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor="#B0B0B0"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#B0B0B0"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+        <PrimaryButton title={loading ? 'Logging in...' : 'Login'} onPress={login} disabled={loading} />
+        <Text style={styles.link} onPress={() => navigation.navigate('Register')}>
+          Don't have an account? Sign Up
+        </Text>
+      </GlassCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
-  input: { borderWidth: 1, marginBottom: 10, padding: 10, borderRadius: 5 },
+  container: { flex: 1, justifyContent: 'center', backgroundColor: Theme.colors.background, padding: Theme.spacing(2) },
+  card: { width: '100%' },
+  title: { ...Theme.typography.h2, color: '#FFF', textAlign: 'center', marginBottom: Theme.spacing(3) },
+  input: {
+    backgroundColor: '#2D2D2D',
+    color: '#FFF',
+    padding: Theme.spacing(2),
+    borderRadius: Theme.radius.sm,
+    marginBottom: Theme.spacing(2),
+  },
+  link: { color: Theme.colors.primary, textAlign: 'center', marginTop: Theme.spacing(2) },
 });
