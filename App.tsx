@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+// App.tsx
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Image, StatusBar } from 'react-native';
 import { useFonts, Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { auth, db } from './src/firebase';
 import LoginScreen from './src/screens/LoginScreen';
@@ -21,6 +23,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import SavedPlansScreen from './src/screens/SavedPlansScreen';
 import { Theme } from './src/theme';
 
+// Prevent auto-hide
 SplashScreen.preventAutoHideAsync();
 
 export type TabParamList = {
@@ -62,11 +65,11 @@ const MainTabs = () => (
 );
 
 const useOnboardingCheck = (user: User | null) => {
-  const [ready, setReady] = useState(false);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [uid, setUid] = useState<string | null>(null);
+  const [ready, setReady] = React.useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = React.useState(false);
+  const [uid, setUid] = React.useState<string | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!user) {
       setReady(true);
       return;
@@ -83,7 +86,7 @@ const useOnboardingCheck = (user: User | null) => {
 };
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = React.useState<User | null>(null);
   const { ready, needsOnboarding, uid } = useOnboardingCheck(user);
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_600SemiBold, Inter_700Bold });
 
@@ -93,36 +96,52 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded && ready) SplashScreen.hideAsync();
+    if (fontsLoaded && ready) {
+      SplashScreen.hideAsync();
+    }
   }, [fontsLoaded, ready]);
 
+  // SHOW SPLASH IMAGE
   if (!fontsLoaded || !ready) {
-    return null;
+    return (
+      <View style={styles.splashContainer}>
+        <Image
+          source={require('./assets/splash-screen.png')}
+          style={styles.splashImage}
+          resizeMode="contain"
+        />
+      </View>
+    );
   }
 
+  // SHOW APP
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!user ? (
-            <>
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="Register" component={RegisterScreen} />
-            </>
-          ) : needsOnboarding && uid ? (
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} initialParams={{ uid }} />
-          ) : (
-            <Stack.Screen name="Main" component={MainTabs} />
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {!user ? (
+              <>
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Register" component={RegisterScreen} />
+              </>
+            ) : needsOnboarding && uid ? (
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} initialParams={{ uid }} />
+            ) : (
+              <Stack.Screen name="Main" component={MainTabs} />
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Theme.colors.background },
+  splashContainer: { flex: 1, backgroundColor: '#0D0D0D', justifyContent: 'center', alignItems: 'center' },
+  splashImage: { width: '80%', height: '80%' },
   tabBar: {
     backgroundColor: 'rgba(26,26,26,0.9)',
     borderTopWidth: 1,
