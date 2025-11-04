@@ -1,105 +1,99 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Button, StyleSheet, Alert } from 'react-native';
-import { collection, query, where, getDocs, deleteDoc, doc as firestoreDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { FlatList, View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { GlassCard } from '../components/GlassCard';
+import { getMealLogs, deleteMealLog } from '../services/scanService';
+import { Theme } from '../theme';
 
-type LogEntry = {
-  id: string;
-  userId?: string;
-  date?: string;
-  calories?: number;
-  proteins?: number;
-  carbs?: number;
-  fats?: number;
-  [key: string]: any;
-};
+export default function LogScreen() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export default function LogScreen(): React.ReactElement {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const loadLogs = async () => {
+    setLoading(true);
+    try {
+      const data = await getMealLogs();
+      setLogs(data);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to load logs');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const userId = auth.currentUser?.uid;
-        if (!userId) {
-          console.warn('No authenticated user - skipping log fetch');
-          setLogs([]);
-          return;
-        }
-
-        const q = query(collection(db, 'mealLogs'), where('userId', '==', userId));
-        const snapshot = await getDocs(q);
-        const logData = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Omit<LogEntry, 'id'>) })) as LogEntry[];
-        setLogs(logData);
-        console.log('Logs fetched:', logData.length);
-      } catch (error) {
-        console.error('Error fetching logs:', error);
-        Alert.alert('Error', 'Failed to load logs. Check console for details.');
-      }
-    };
-
-    fetchLogs();
+    loadLogs();
   }, []);
 
-  const deleteLog = async (id: string) => {
-    try {
-      await deleteDoc(firestoreDoc(db, 'mealLogs', id));
-      setLogs(prev => prev.filter(log => log.id !== id));
-      console.log('Log deleted:', id);
-      Alert.alert('Success', 'Log deleted!');
-    } catch (error) {
-      console.error('Error deleting log:', error);
-      Alert.alert('Error', 'Failed to delete log.');
-    }
+  const remove = (id: string) => {
+    Alert.alert('Delete', 'Remove this log?', [
+      { text: 'Cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteMealLog(id);
+          setLogs(prev => prev.filter(log => log.id !== id));
+        },
+      },
+    ]);
   };
 
-  const editLog = async (id: string, newCalories: number) => {
-    try {
-      await updateDoc(firestoreDoc(db, 'mealLogs', id), { calories: newCalories });
-      setLogs(prev => prev.map(log => (log.id === id ? { ...log, calories: newCalories } : log)));
-      console.log('Log updated:', id);
-      Alert.alert('Success', 'Log updated!');
-    } catch (error) {
-      console.error('Error updating log:', error);
-      Alert.alert('Error', 'Failed to update log.');
-    }
-  };
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.loadingText}>Loading logs...</Text>
+      </View>
+    );
+  }
+
+  if (!logs.length) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.emptyText}>No meal logs yet</Text>
+        <Text style={styles.caption}>Scan a meal to get started!</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={logs}
-        keyExtractor={item => item.id}
-        ListEmptyComponent={<Text style={styles.empty}>No logs available. Scan a meal to start!</Text>}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            <View style={styles.itemText}>
-              <Text style={styles.dateText}>{item.date ? new Date(item.date).toLocaleString() : 'Unknown date'}</Text>
-              <Text>{(item.calories ?? 0) + ' kcal'}</Text>
-            </View>
-            <View style={styles.buttons}>
-              <Button title="Edit (+100)" onPress={() => editLog(item.id, (item.calories ?? 0) + 100)} />
-              <Button title="Delete" onPress={() => deleteLog(item.id)} color="#DC3545" />
-            </View>
+    <FlatList
+      data={logs}
+      keyExtractor={item => item.id}
+      contentContainerStyle={styles.list}
+      ItemSeparatorComponent={() => <View style={styles.separator} />}
+      renderItem={({ item }) => (
+        <GlassCard>
+          <Text style={styles.date}>
+            {new Date(item.date).toLocaleDateString()} • {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+          <Text style={styles.calories}>{item.calories} kcal</Text>
+          <View style={styles.nutrients}>
+            <Text style={styles.nut}>P: {item.protein}g</Text>
+            <Text style={styles.nut}>C: {item.carbs}g</Text>
+            <Text style={styles.nut}>F: {item.fat}g</Text>
           </View>
-        )}
-      />
-    </View>
+          <View style={styles.actions}>
+            <TouchableOpacity onPress={() => remove(item.id)}>
+              <Text style={styles.delete}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </GlassCard>
+      )}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  item: {
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-    marginBottom: 8,
-  },
-  itemText: { marginBottom: 8 },
-  buttons: { flexDirection: 'row', justifyContent: 'space-between' },
-  empty: { textAlign: 'center', padding: 20, color: '#666' },
-  dateText: { fontWeight: '600' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Theme.spacing(3) },
+  loadingText: { ...Theme.typography.h2, color: '#FFF' },
+  emptyText: { ...Theme.typography.h2, color: '#FFF', textAlign: 'center' },
+  caption: { ...Theme.typography.caption, marginTop: 8, textAlign: 'center' },
+  list: { padding: Theme.spacing(2), backgroundColor: Theme.colors.background },
+  separator: { height: Theme.spacing(3) },
+  date: { ...Theme.typography.caption },
+  calories: { ...Theme.typography.h1, color: Theme.colors.primary, marginVertical: 4 },
+  nutrients: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 8 },
+  nut: { ...Theme.typography.body, color: '#B0B0B0' },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 },
+  delete: { color: Theme.colors.error, fontWeight: '600' },
 });

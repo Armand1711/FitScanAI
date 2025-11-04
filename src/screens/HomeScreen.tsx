@@ -48,41 +48,45 @@ export default function HomeScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <GlassCard>
-        <Text style={styles.title}>Daily Goal</Text>
-        <Text style={styles.goal}>{goal} kcal</Text>
-        <Text style={styles.today}>Today: {daily} kcal</Text>
-        <Bar progress={daily/goal} width={null} color={Theme.colors.primary} style={styles.bar} />
-      </GlassCard>
+      <View style={styles.center}>
+        <GlassCard style={styles.card}>
+          <Text style={styles.title}>Daily Goal</Text>
+          <Text style={styles.goal}>{goal} kcal</Text>
+          <Text style={styles.today}>Today: {daily} kcal</Text>
+          <Bar progress={daily/goal} width={null} color={Theme.colors.primary} style={styles.bar} />
+        </GlassCard>
 
-      <GlassCard style={styles.chart}>
-        <Text style={styles.chartTitle}>7‑Day Trend</Text>
-        <LineChart
-          data={{ labels: ['S','M','T','W','T','F','S'], datasets: [{ data: week }] }}
-          width={340}
-          height={200}
-          chartConfig={{
-            backgroundGradientFrom: '#1A1A1A',
-            backgroundGradientTo: '#1A1A1A',
-            color: () => Theme.colors.primary,
-            labelColor: () => '#B0B0B0',
-          }}
-          bezier
-          style={{ borderRadius: Theme.radius.md }}
-        />
-      </GlassCard>
+        <GlassCard style={[styles.card, styles.chart]}>
+          <Text style={styles.chartTitle}>7‑Day Trend</Text>
+          <LineChart
+            data={{ labels: ['S','M','T','W','T','F','S'], datasets: [{ data: week }] }}
+            width={340}
+            height={200}
+            chartConfig={{
+              backgroundGradientFrom: '#1A1A1A',
+              backgroundGradientTo: '#1A1A1A',
+              color: () => Theme.colors.primary,
+              labelColor: () => '#B0B0B0',
+            }}
+            bezier
+            style={{ borderRadius: Theme.radius.md }}
+          />
+        </GlassCard>
 
-      <PrimaryButton title="Scan Meal" onPress={() => navigation.navigate('Scan')} />
+        <PrimaryButton title="Scan Meal" onPress={() => navigation.navigate('Scan')} />
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: Theme.spacing(2), backgroundColor: Theme.colors.background },
-  title: { ...Theme.typography.h2, color: '#FFF', marginBottom: Theme.spacing(1) },
-  goal: { ...Theme.typography.h1, color: Theme.colors.primary },
-  today: { ...Theme.typography.body, color: '#FFF', marginBottom: Theme.spacing(2) },
+  container: { flexGrow: 1, backgroundColor: Theme.colors.background, padding: Theme.spacing(2) },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  card: { width: '100%', maxWidth: 380, marginBottom: Theme.spacing(3) },
+  title: { ...Theme.typography.h2, color: '#FFF', marginBottom: Theme.spacing(1), textAlign: 'center' },
+  goal: { ...Theme.typography.h1, color: Theme.colors.primary, textAlign: 'center' },
+  today: { ...Theme.typography.body, color: '#FFF', marginBottom: Theme.spacing(2), textAlign: 'center' },
   bar: { marginTop: Theme.spacing(2) },
-  chart: { marginTop: Theme.spacing(3) },
-  chartTitle: { ...Theme.typography.h2, color: '#FFF', marginBottom: Theme.spacing(1) },
+  chart: { marginTop: Theme.spacing(1) },
+  chartTitle: { ...Theme.typography.h2, color: '#FFF', marginBottom: Theme.spacing(1), textAlign: 'center' },
 });

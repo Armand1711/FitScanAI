@@ -21,10 +21,11 @@ export const PrimaryButton = ({ title, onPress, disabled }: Props) => (
 
 const styles = StyleSheet.create({
   btn: {
-    paddingVertical: Theme.spacing(2),
-    paddingHorizontal: Theme.spacing(4),
+    paddingVertical: Theme.spacing(2.5), 
+    paddingHorizontal: Theme.spacing(6), 
     borderRadius: Theme.radius.sm,
     alignItems: 'center',
+    marginVertical: Theme.spacing(2), 
   },
   text: { ...Theme.typography.body, color: '#FFF', fontWeight: '600' },
 });

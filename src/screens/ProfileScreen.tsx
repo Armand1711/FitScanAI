@@ -6,6 +6,7 @@ import { Theme } from '../theme';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 
 export default function ProfileScreen() {
   const [name, setName] = useState('');
@@ -60,6 +61,31 @@ export default function ProfileScreen() {
     }
   };
 
+  const changePassword = () => {
+    Alert.prompt(
+      'Change Password',
+      'Enter current password',
+      async (current) => {
+        if (!current) return;
+        Alert.prompt(
+          'New Password',
+          'Enter new password',
+          async (newPass) => {
+            if (!newPass) return;
+            try {
+              const credential = EmailAuthProvider.credential(auth.currentUser!.email!, current);
+              await reauthenticateWithCredential(auth.currentUser!, credential);
+              await updatePassword(auth.currentUser!, newPass);
+              Alert.alert('Success', 'Password changed');
+            } catch (e: any) {
+              Alert.alert('Error', e.message);
+            }
+          }
+        );
+      }
+    );
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <GlassCard>
@@ -80,7 +106,8 @@ export default function ProfileScreen() {
         <Text style={styles.label}>Allergies</Text>
         <Text style={styles.value}>{allergies || 'None'}</Text>
 
-        <PrimaryButton title="Edit Profile" onPress={() => Alert.alert('Edit', 'Coming soon')} />
+        <PrimaryButton title="Save Changes" onPress={save} disabled={loading} />
+        <PrimaryButton title="Change Password" onPress={changePassword} />
       </GlassCard>
 
       <PrimaryButton title="Logout" onPress={() => auth.signOut()} />

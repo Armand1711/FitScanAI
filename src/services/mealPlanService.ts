@@ -2,6 +2,9 @@
 import { addDoc, collection, deleteDoc, doc, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
+// YOUR KEY – HARD‑CODED
+const GEMINI_API_KEY = 'AIzaSyDfFQVDNMK0EkrwI26kVuOeI8iGB_0y7TY';
+
 export interface SavedMealPlan {
   id?: string;
   goal: number;
@@ -11,6 +14,7 @@ export interface SavedMealPlan {
   createdAt: string;
 }
 
+/* ---------- SAVE ---------- */
 export const saveMealPlan = async (plan: Omit<SavedMealPlan, 'id' | 'createdAt'>) => {
   if (!auth.currentUser) throw new Error('User not authenticated');
 
@@ -23,7 +27,7 @@ export const saveMealPlan = async (plan: Omit<SavedMealPlan, 'id' | 'createdAt'>
   return { id: ref.id, ...plan, createdAt: new Date().toISOString() };
 };
 
-
+/* ---------- GET ---------- */
 export const getSavedPlans = async (): Promise<SavedMealPlan[]> => {
   if (!auth.currentUser) return [];
 
@@ -39,19 +43,17 @@ export const getSavedPlans = async (): Promise<SavedMealPlan[]> => {
   } as SavedMealPlan));
 };
 
-
+/* ---------- DELETE ---------- */
 export const deleteMealPlan = async (id: string) => {
   await deleteDoc(doc(db, 'savedPlans', id));
 };
 
-
+/* ---------- GENERATE ---------- */
 export const generateMealPlan = async (profile: {
   goal: number;
   dietaryPreference: string;
   allergies: string[];
 }) => {
-  const GEMINI_API_KEY = 'AIzaSyDfFQVDNMK0EkrwI26kVuOeI8iGB_0y7TY';
-
   const allergiesText = profile.allergies.length
     ? `Avoid these allergies: ${profile.allergies.join(', ')}.`
     : 'No allergies specified.';
@@ -59,7 +61,7 @@ export const generateMealPlan = async (profile: {
   const prompt = `
 You are a nutrition expert. Create a **balanced ${profile.goal} kcal daily meal plan** for a **${profile.dietaryPreference}** diet.
 ${allergiesText}
-Include **breakfast, lunch, dinner, and 1-2 snacks** with **approximate calorie counts** for each item.
+Include **breakfast, lunch, dinner, and 1‑2 snacks** with **approximate calorie counts** for each item.
 Return **only plain text** – no markdown, no JSON.
 `;
 

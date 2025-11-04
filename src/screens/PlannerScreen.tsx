@@ -89,7 +89,7 @@ export default function PlannerScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: Theme.spacing(2), backgroundColor: Theme.colors.background },
+container: { flexGrow: 1, backgroundColor: Theme.colors.background, padding: Theme.spacing(2) },
   title: { ...Theme.typography.h2, color: '#FFF', marginBottom: Theme.spacing(1) },
   goal: { ...Theme.typography.body, color: Theme.colors.primary, fontWeight: '600' },
   diet: { ...Theme.typography.caption },
