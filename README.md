@@ -9,7 +9,7 @@ FitScanAI is an AI-powered mobile app that helps you track meals, generate perso
 ## Demo Video
 
 
-  https://www.youtube.com/watch?v=YOUR_VIDEO_ID
+  https://youtu.be/e56sno5W8wg
 
 
 
